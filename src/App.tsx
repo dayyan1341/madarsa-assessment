@@ -12,7 +12,7 @@ function App() {
 
       <div className='grow w-full max-w-4xl p-4'>
 
-        <PrayerCard title='Isha' />
+        <PrayerCard />
       </div>
       <BottomTabs />
     </div>

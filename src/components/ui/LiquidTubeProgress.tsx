@@ -3,7 +3,7 @@ import { motion, useAnimation } from 'framer-motion';
 
 interface PrayerSegment {
     name: string;
-    startTime: string;
+    time: string;
     endTime: string;
 }
 

@@ -1,94 +1,88 @@
 import { CloudMoonIcon, CloudSunIcon, MoonStarsIcon, SunHorizonIcon, SunIcon } from '@phosphor-icons/react/dist/ssr';
-import React from 'react';
+import { addDays, differenceInMinutes, format, parse } from 'date-fns';
+import React, { useEffect, useState } from 'react';
 import LiquidTubeProgress from './ui/LiquidTubeProgress';
 
 interface PrayerTime {
     name: string;
-    time: string;
+    time: string; // "HH:mm" format
     icon: React.ReactNode;
 }
 
 interface PrayerTimeCardProps {
-    title: string;
-    subtitle?: string;
     dayLabel?: string;
     backgroundGradient?: string;
-    prayerTimes?: PrayerTime[];
-    currentPrayer?: string;
-    currentTime?: string; // Current time in "HH:MM" format
 }
 
 const defaultPrayerTimes: PrayerTime[] = [
-    { name: 'Fajr', time: '5:51', icon: <CloudMoonIcon className="w-4 h-4" /> },
+    { name: 'Fajr', time: '05:51', icon: <CloudMoonIcon className="w-4 h-4" /> },
     { name: 'Dhuhr', time: '12:27', icon: <SunIcon className="w-4 h-4" /> },
-    { name: 'Asr', time: '3:21', icon: <CloudSunIcon className="w-4 h-4" /> },
-    { name: 'Maghrib', time: '5:40', icon: <SunHorizonIcon className="w-4 h-4" /> },
-    { name: 'Isha', time: '7:04', icon: <MoonStarsIcon className="w-4 h-4" /> },
+    { name: 'Asr', time: '15:21', icon: <CloudSunIcon className="w-4 h-4" /> },
+    { name: 'Maghrib', time: '17:40', icon: <SunHorizonIcon className="w-4 h-4" /> },
+    { name: 'Isha', time: '19:04', icon: <MoonStarsIcon className="w-4 h-4" /> },
 ];
 
-// Helper function to convert time string to minutes since midnight
-const timeToMinutes = (timeStr: string): number => {
-    const [hours, minutes] = timeStr.split(':').map(Number);
-    return hours * 60 + minutes;
-};
+// Helper to get prayer info based on the current time
+const getPrayerInfo = (now: Date) => {
+    const today = now;
+    const tomorrow = addDays(today, 1);
 
-// Helper function to calculate fill percentage
-const calculateFillPercentage = (
-    currentTime: string,
-    currentPrayer: string,
-    prayerTimes: PrayerTime[]
-): number => {
-    const currentMinutes = timeToMinutes(currentTime);
-    const currentPrayerIndex = prayerTimes.findIndex(p => p.name === currentPrayer);
+    // Create Date objects for today's prayers
+    const prayerDateTimes = defaultPrayerTimes.map(p => parse(p.time, 'HH:mm', today));
 
-    if (currentPrayerIndex === -1) return 0;
+    // Find the index of the next prayer
+    let nextPrayerIndex = prayerDateTimes.findIndex(prayerDate => prayerDate > now);
 
-    const currentPrayerStart = timeToMinutes(prayerTimes[currentPrayerIndex].time);
-    const nextPrayerIndex = (currentPrayerIndex + 1) % prayerTimes.length;
-    let nextPrayerStart = timeToMinutes(prayerTimes[nextPrayerIndex].time);
+    let currentPrayerIndex;
+    let nextPrayerTime;
 
-    // Handle case where next prayer is next day (like Isha to Fajr)
-    if (nextPrayerStart <= currentPrayerStart) {
-        nextPrayerStart += 24 * 60; // Add 24 hours
+    if (nextPrayerIndex === -1) {
+        // After Isha, next prayer is Fajr tomorrow
+        currentPrayerIndex = 4; // Isha
+        nextPrayerIndex = 0;
+        nextPrayerTime = parse(defaultPrayerTimes[0].time, 'HH:mm', tomorrow);
+    } else {
+        currentPrayerIndex = (nextPrayerIndex + defaultPrayerTimes.length - 1) % defaultPrayerTimes.length;
+        nextPrayerTime = prayerDateTimes[nextPrayerIndex];
     }
 
-    let adjustedCurrentTime = currentMinutes;
-    // Handle case where current time is past midnight
-    if (currentMinutes < currentPrayerStart && currentPrayerIndex === 4) { // Isha prayer
-        adjustedCurrentTime += 24 * 60;
-    }
+    const currentPrayer = defaultPrayerTimes[currentPrayerIndex];
+    const currentPrayerTime = prayerDateTimes[currentPrayerIndex];
 
-    const totalDuration = nextPrayerStart - currentPrayerStart;
-    const elapsed = adjustedCurrentTime - currentPrayerStart;
+    // Calculate fill percentage
+    const timeSinceCurrentPrayer = differenceInMinutes(now, currentPrayerTime);
+    const totalDuration = differenceInMinutes(nextPrayerTime, currentPrayerTime);
+    const fillPercentage = Math.max(0, Math.min(100, (timeSinceCurrentPrayer / totalDuration) * 100));
 
-    return Math.max(0, Math.min(100, (elapsed / totalDuration) * 100));
+    // Calculate time remaining for subtitle
+    const minutesToNextPrayer = differenceInMinutes(nextPrayerTime, now);
+    const hours = Math.floor(minutesToNextPrayer / 60);
+    const minutes = minutesToNextPrayer % 60;
+    const subtitle = `Next prayer in ${hours}h ${minutes}m`;
+
+    return {
+        currentPrayerName: currentPrayer.name,
+        fillPercentage,
+        subtitle,
+    };
 };
 
 export const PrayerCard: React.FC<PrayerTimeCardProps> = ({
-    title,
-    subtitle = "Next prayer in 1h 29m",
-    dayLabel = "Sunday",
+    dayLabel,
     backgroundGradient,
-    prayerTimes = defaultPrayerTimes,
-    currentPrayer = "Isha",
-    currentTime = "8:30" // Default current time
 }) => {
+    const [now, setNow] = useState(new Date());
+
+    useEffect(() => {
+        const timer = setInterval(() => setNow(new Date()), 60000); // Update every minute
+        return () => clearInterval(timer);
+    }, []);
+
+    const { currentPrayerName, fillPercentage, subtitle } = getPrayerInfo(now);
     const bgClass = backgroundGradient || "bg-gradient-to-br from-prayer-gradient-start to-prayer-gradient-end";
+    const currentDayLabel = dayLabel || format(now, 'EEEE');
 
-    // Calculate fill percentage automatically
-    const fillPercentage = calculateFillPercentage(currentTime, currentPrayer, prayerTimes);
-
-    // Create prayer segments for the tube with proper end times
-    const prayerSegments = prayerTimes.map((prayer, index) => {
-        const nextIndex = (index + 1) % prayerTimes.length;
-        const nextPrayerTime = prayerTimes[nextIndex].time;
-
-        return {
-            name: prayer.name,
-            startTime: prayer.time,
-            endTime: nextPrayerTime,
-        };
-    });
+    const prayerSegments = defaultPrayerTimes.map(p => ({ ...p, endTime: p.time }));
 
     return (
         <div className="w-full max-w-sm mx-auto">
@@ -98,53 +92,37 @@ export const PrayerCard: React.FC<PrayerTimeCardProps> = ({
                     <div className="flex-col items-center gap-3">
                         <div className='flex gap-1 items-center'>
                             <MoonStarsIcon className="w-6 h-6" />
-                            <h1 className="text-2xl font-semibold">{title}</h1>
+                            <h1 className="text-2xl font-semibold">{currentPrayerName}</h1>
                         </div>
                         <p className="text-white text-sm">{subtitle}</p>
                     </div>
                     <div className="bg-white/20 px-4 py-0.5 flex items-center rounded-full">
-                        <span className="text-sm font-medium">{dayLabel}</span>
+                        <span className="text-sm font-medium">{currentDayLabel}</span>
                     </div>
                 </div>
 
                 {/* Prayer Times */}
                 <div className="flex justify-around items-center mb-4">
-                    {prayerTimes.map((prayer, index) => (
+                    {defaultPrayerTimes.map((prayer) => (
                         <div
                             key={prayer.name}
-                            className={`text-center ${prayer.name === currentPrayer
-                                ? 'text-white'
-                                : 'text-gray-400'
-                                }`}
+                            className={`text-center ${prayer.name === currentPrayerName ? 'text-white' : 'text-gray-400'}`}
                         >
-                            <div className="mb-1 flex justify-center">
-                                {prayer.icon}
-                            </div>
-                            <div className={`text-sm font-medium ${prayer.name === currentPrayer
-                                ? 'text-white'
-                                : 'text-gray-400'
-                                }`}>
+                            <div className="mb-1 flex justify-center">{prayer.icon}</div>
+                            <div className={`text-sm font-medium ${prayer.name === currentPrayerName ? 'text-white' : 'text-gray-400'}`}>
                                 {prayer.name}
                             </div>
-                            <div className={`text-xs ${prayer.name === currentPrayer
-                                ? 'text-white font-semibold'
-                                : 'text-gray-400'
-                                }`}>
-                                {prayer.time}
+                            <div className={`text-xs ${prayer.name === currentPrayerName ? 'text-white font-semibold' : 'text-gray-400'}`}>
+                                {format(parse(prayer.time, 'HH:mm', new Date()), 'h:mm a')}
                             </div>
                         </div>
                     ))}
                 </div>
 
-                {/* Debug info */}
-                {/* <div className="text-xs text-white/60 mb-2 text-center">
-                    Current: {currentTime} | Fill: {fillPercentage.toFixed(1)}%
-                </div> */}
-
                 {/* Progress Indicator */}
                 <LiquidTubeProgress
                     fillPercentage={fillPercentage}
-                    currentPrayer={currentPrayer}
+                    currentPrayer={currentPrayerName}
                     prayerSegments={prayerSegments}
                 />
             </div>
