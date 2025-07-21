@@ -29,13 +29,13 @@ const PRAYER_GRADIENTS = {
     Isha: 'bg-gradient-to-t from-[#811dec] to-[#381079]',      // Purple to indigo
 } as const;
 
-const TEST_DATES = {
-    Fajr: new Date('2025-07-21T05:30:00'),
-    Dhuhr: new Date('2025-07-21T14:15:00'),
-    Asr: new Date('2025-07-21T16:30:00'),
-    Maghrib: new Date('2025-07-21T19:50:00'),
-    Isha: new Date('2025-07-21T23:15:00'),
-} as const;
+//const TEST_DATES = {
+//    Fajr: new Date('2025-07-21T05:30:00'),
+//    Dhuhr: new Date('2025-07-21T14:15:00'),
+//    Asr: new Date('2025-07-21T16:30:00'),
+//    Maghrib: new Date('2025-07-21T19:50:00'),
+//    Isha: new Date('2025-07-21T23:15:00'),
+//} as const;
 
 export const PrayerCard: React.FC = () => {
     const { prayerTimes, address } = usePrayerStore();
