@@ -1,3 +1,4 @@
+// Not used (A relatively simple semi-circle progress component)
 const SemiCircleProgress: React.FC<{ fillPercentage: number }> = ({ fillPercentage }) => {
     const totalSegments = 5;
     const filledSegments = Math.round((fillPercentage / 100) * totalSegments);
@@ -26,7 +27,7 @@ const SemiCircleProgress: React.FC<{ fillPercentage: number }> = ({ fillPercenta
                             <path
                                 key={index}
                                 d={`M ${x1} ${y1} A ${radius} ${radius} 0 0 0 ${x2} ${y2}`}
-                                stroke={isFilled ? "hsl(var(--prayer-progress))" : "hsl(var(--prayer-progress-bg))"}
+                                stroke={isFilled ? "#fff" : "rgba(255, 255, 255, 0.1)"}
                                 strokeWidth="4"
                                 fill="none"
                                 strokeLinecap="round"

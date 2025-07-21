@@ -1,129 +1,103 @@
 import { CloudMoonIcon, CloudSunIcon, MoonStarsIcon, SunHorizonIcon, SunIcon } from '@phosphor-icons/react/dist/ssr';
-import { addDays, differenceInMinutes, format, parse } from 'date-fns';
+import { format, parse } from 'date-fns';
 import React, { useEffect, useState } from 'react';
 import LiquidTubeProgress from './ui/LiquidTubeProgress';
+import { getPrayerInfo } from '../utils/utils';
+import { usePrayerStore } from '../store/prayerStore';
 
-interface PrayerTime {
-    name: string;
-    time: string; // "HH:mm" format
-    icon: React.ReactNode;
-}
+const PRAYER_ICONS = {
+    Fajr: <CloudMoonIcon className="w-4 h-4" />,
+    Dhuhr: <SunIcon className="w-4 h-4" />,
+    Asr: <CloudSunIcon className="w-4 h-4" />,
+    Maghrib: <SunHorizonIcon className="w-4 h-4" />,
+    Isha: <MoonStarsIcon className="w-4 h-4" />,
+} as const;
 
-interface PrayerTimeCardProps {
-    dayLabel?: string;
-    backgroundGradient?: string;
-}
+// const PRAYER_GRADIENTS = {
+//     Fajr: 'bg-gradient-to-br from-blue-500 via-purple-600 to-indigo-700',
+//     Dhuhr: 'bg-gradient-to-br from-yellow-400 via-orange-400 to-amber-500',
+//     Asr: 'bg-gradient-to-br from-emerald-500 via-teal-500 to-cyan-600',
+//     Maghrib: 'bg-gradient-to-br from-orange-400 via-red-400 to-pink-500',
+//     Isha: 'bg-gradient-to-br from-purple-600 via-indigo-700 to-violet-800',
+// } as const;
 
-const defaultPrayerTimes: PrayerTime[] = [
-    { name: 'Fajr', time: '05:51', icon: <CloudMoonIcon className="w-4 h-4" /> },
-    { name: 'Dhuhr', time: '12:27', icon: <SunIcon className="w-4 h-4" /> },
-    { name: 'Asr', time: '15:21', icon: <CloudSunIcon className="w-4 h-4" /> },
-    { name: 'Maghrib', time: '17:40', icon: <SunHorizonIcon className="w-4 h-4" /> },
-    { name: 'Isha', time: '19:04', icon: <MoonStarsIcon className="w-4 h-4" /> },
-];
+const PRAYER_GRADIENTS = {
+    Fajr: 'bg-gradient-to-b from-[#3f7ce6] to-[#d6bdff]',      // Blue to purple
+    Dhuhr: 'bg-gradient-to-b from-[#e77715] to-[#ffe392]',     // Bright yellow to orange
+    Asr: 'bg-gradient-to-b from-[#006c5e]  to-[#c9f3b3]',       // Emerald to teal to cyan
+    Maghrib: 'bg-gradient-to-t from-[#ff88a8] to-[#ff9452]',   // Orange to red to pink
+    Isha: 'bg-gradient-to-t from-[#811dec] to-[#381079]',      // Purple to indigo
+} as const;
 
-// Helper to get prayer info based on the current time
-const getPrayerInfo = (now: Date) => {
-    const today = now;
-    const tomorrow = addDays(today, 1);
+const TEST_DATES = {
+    Fajr: new Date('2025-07-21T05:30:00'),
+    Dhuhr: new Date('2025-07-21T14:15:00'),
+    Asr: new Date('2025-07-21T16:30:00'),
+    Maghrib: new Date('2025-07-21T19:50:00'),
+    Isha: new Date('2025-07-21T23:15:00'),
+} as const;
 
-    // Create Date objects for today's prayers
-    const prayerDateTimes = defaultPrayerTimes.map(p => parse(p.time, 'HH:mm', today));
-
-    // Find the index of the next prayer
-    let nextPrayerIndex = prayerDateTimes.findIndex(prayerDate => prayerDate > now);
-
-    let currentPrayerIndex;
-    let nextPrayerTime;
-
-    if (nextPrayerIndex === -1) {
-        // After Isha, next prayer is Fajr tomorrow
-        currentPrayerIndex = 4; // Isha
-        nextPrayerIndex = 0;
-        nextPrayerTime = parse(defaultPrayerTimes[0].time, 'HH:mm', tomorrow);
-    } else {
-        currentPrayerIndex = (nextPrayerIndex + defaultPrayerTimes.length - 1) % defaultPrayerTimes.length;
-        nextPrayerTime = prayerDateTimes[nextPrayerIndex];
-    }
-
-    const currentPrayer = defaultPrayerTimes[currentPrayerIndex];
-    const currentPrayerTime = prayerDateTimes[currentPrayerIndex];
-
-    // Calculate fill percentage
-    const timeSinceCurrentPrayer = differenceInMinutes(now, currentPrayerTime);
-    const totalDuration = differenceInMinutes(nextPrayerTime, currentPrayerTime);
-    const fillPercentage = Math.max(0, Math.min(100, (timeSinceCurrentPrayer / totalDuration) * 100));
-
-    // Calculate time remaining for subtitle
-    const minutesToNextPrayer = differenceInMinutes(nextPrayerTime, now);
-    const hours = Math.floor(minutesToNextPrayer / 60);
-    const minutes = minutesToNextPrayer % 60;
-    const subtitle = `Next prayer in ${hours}h ${minutes}m`;
-
-    return {
-        currentPrayerName: currentPrayer.name,
-        fillPercentage,
-        subtitle,
-    };
-};
-
-export const PrayerCard: React.FC<PrayerTimeCardProps> = ({
-    dayLabel,
-    backgroundGradient,
-}) => {
-    const [now, setNow] = useState(new Date());
+export const PrayerCard: React.FC = () => {
+    const { prayerTimes, address } = usePrayerStore();
+    const [now, setNow] = useState(TEST_DATES.Fajr || new Date());
 
     useEffect(() => {
-        const timer = setInterval(() => setNow(new Date()), 60000); // Update every minute
+        const timer = setInterval(() => setNow(new Date()), 60000);
         return () => clearInterval(timer);
     }, []);
 
-    const { currentPrayerName, fillPercentage, subtitle } = getPrayerInfo(now);
-    const bgClass = backgroundGradient || "bg-gradient-to-br from-prayer-gradient-start to-prayer-gradient-end";
-    const currentDayLabel = dayLabel || format(now, 'EEEE');
+    if (!prayerTimes) return null;
 
-    const prayerSegments = defaultPrayerTimes.map(p => ({ ...p, endTime: p.time }));
+    const { currentPrayerName, fillPercentage, subtitle, currentPrayerIndex } = getPrayerInfo(now, prayerTimes);
+    const bgClass = PRAYER_GRADIENTS[currentPrayerName as keyof typeof PRAYER_GRADIENTS];
+    const currentDayLabel = format(now, 'EEEE');
 
     return (
         <div className="w-full max-w-sm mx-auto">
-            <div className={`${bgClass} rounded-2xl p-5 pb-0 text-prayer-text-primary relative overflow-hidden`}>
-                {/* Top Row */}
-                <div className="flex items-center justify-between mb-6">
-                    <div className="flex-col items-center gap-3">
+            <div className={`${bgClass} rounded-2xl p-5 pb-0 text-white relative overflow-hidden transition-all duration-1000 ease-in-out`}>
+                <div className="flex items-start justify-between mb-4">
+                    <div className="flex-col items-start gap-3">
                         <div className='flex gap-1 items-center'>
                             <MoonStarsIcon className="w-6 h-6" />
-                            <h1 className="text-2xl font-semibold">{currentPrayerName}</h1>
+                            <h1 className="text-2xl font-semibold text-white">{currentPrayerName}</h1>
                         </div>
                         <p className="text-white text-sm">{subtitle}</p>
+                        {address && <p className="text-xs text-white/70 mt-1 max-w-xs truncate">{address}</p>}
                     </div>
-                    <div className="bg-white/20 px-4 py-0.5 flex items-center rounded-full">
-                        <span className="text-sm font-medium">{currentDayLabel}</span>
+                    <div className="bg-white/20 px-4 py-0.5 flex items-center rounded-full backdrop-blur-sm">
+                        <span className="text-sm font-medium text-white">{currentDayLabel}</span>
                     </div>
                 </div>
 
-                {/* Prayer Times */}
                 <div className="flex justify-around items-center mb-4">
-                    {defaultPrayerTimes.map((prayer) => (
+                    {Object.entries(prayerTimes).map(([prayerName, time]) => (
                         <div
-                            key={prayer.name}
-                            className={`text-center ${prayer.name === currentPrayerName ? 'text-white' : 'text-gray-400'}`}
+                            key={prayerName}
+                            className={`text-center transition-all duration-300 ${prayerName === currentPrayerName
+                                ? 'text-white scale-105'
+                                : 'text-white/60 hover:text-white/80'
+                                }`}
                         >
-                            <div className="mb-1 flex justify-center">{prayer.icon}</div>
-                            <div className={`text-sm font-medium ${prayer.name === currentPrayerName ? 'text-white' : 'text-gray-400'}`}>
-                                {prayer.name}
+                            <div className="mb-1 flex justify-center">
+                                {PRAYER_ICONS[prayerName as keyof typeof PRAYER_ICONS]}
                             </div>
-                            <div className={`text-xs ${prayer.name === currentPrayerName ? 'text-white font-semibold' : 'text-gray-400'}`}>
-                                {format(parse(prayer.time, 'HH:mm', new Date()), 'h:mm a')}
+                            <div className={`text-sm font-medium ${prayerName === currentPrayerName ? 'text-white' : 'text-white/60'
+                                }`}>
+                                {prayerName}
+                            </div>
+                            <div className={`text-xs ${prayerName === currentPrayerName
+                                ? 'text-white font-semibold'
+                                : 'text-white/60'
+                                }`}>
+                                {format(parse(time, 'HH:mm', new Date()), 'h:mm a')}
                             </div>
                         </div>
                     ))}
                 </div>
 
-                {/* Progress Indicator */}
                 <LiquidTubeProgress
                     fillPercentage={fillPercentage}
-                    currentPrayer={currentPrayerName}
-                    prayerSegments={prayerSegments}
+                    currentPrayerIndex={currentPrayerIndex}
                 />
             </div>
         </div>

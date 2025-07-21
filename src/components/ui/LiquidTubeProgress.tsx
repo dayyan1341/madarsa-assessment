@@ -1,20 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { motion, useAnimation } from 'framer-motion';
 
-interface PrayerSegment {
-    name: string;
-    time: string;
-    endTime: string;
-}
-
 interface LiquidTubeProgressProps {
     fillPercentage: number;
-    currentPrayer: string;
-    prayerSegments: PrayerSegment[];
-    primaryColor?: string;
+    currentPrayerIndex: number;
 }
 
-// Helper function to describe an SVG elliptical arc
+const PRAYER_NAMES = ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'];
+
 const describeEllipseArc = (cx: number, cy: number, rx: number, ry: number, startAngle: number, endAngle: number): string => {
     const start = {
         x: cx + rx * Math.cos(startAngle * Math.PI / 180),
@@ -28,30 +21,28 @@ const describeEllipseArc = (cx: number, cy: number, rx: number, ry: number, star
     return `M ${start.x} ${start.y} A ${rx} ${ry} 0 ${largeArcFlag} 1 ${end.x} ${end.y}`;
 };
 
-// --- Individual Segment Component ---
 interface SegmentProps {
     index: number;
     isCurrent: boolean;
     isCompleted: boolean;
     fillPercentage: number;
-    primaryColor: string;
 }
 
-const Segment: React.FC<SegmentProps> = ({ index, isCurrent, isCompleted, fillPercentage, primaryColor }) => {
+const Segment: React.FC<SegmentProps> = ({ index, isCurrent, isCompleted, fillPercentage }) => {
     const pathRef = useRef<SVGPathElement>(null);
     const [length, setLength] = useState(0);
     const controls = useAnimation();
 
+    // Arc configuration
     const totalAngle = 180;
     const numSegments = 5;
-    const gapAngle = 8; // Angle for the gap between segments
+    const gapAngle = 8;
     const segmentAngle = (totalAngle - (numSegments - 1) * gapAngle) / numSegments;
-
     const startAngle = -180 + index * (segmentAngle + gapAngle);
     const endAngle = startAngle + segmentAngle;
 
     const rx = 180; // Horizontal radius
-    const ry = 180; // Vertical radius (smaller for oval shape)
+    const ry = 180; // Vertical radius 
     const cx = 200;
     const cy = 180;
     const strokeWidth = 18;
@@ -60,37 +51,36 @@ const Segment: React.FC<SegmentProps> = ({ index, isCurrent, isCompleted, fillPe
 
     useEffect(() => {
         if (pathRef.current) {
-            const pathLength = pathRef.current.getTotalLength();
-            setLength(pathLength);
+            setLength(pathRef.current.getTotalLength());
         }
     }, [arcPath]);
 
     useEffect(() => {
         let toValue = length;
         if (isCompleted) {
-            toValue = 0; // Fully filled
+            toValue = 0;
         } else if (isCurrent) {
             toValue = length * (1 - fillPercentage / 100);
         }
 
         controls.start({
             strokeDashoffset: toValue,
-            transition: { duration: 1.5, ease: [0.25, 0.1, 0.25, 1] }
+            transition: { duration: 1.5, ease: [0.25, 0.1, 0.25, 1], delay: isCurrent ? 2 : (4 - index) * 0.5 }
         });
     }, [isCompleted, isCurrent, fillPercentage, length, controls]);
 
     return (
         <g>
-            {/* Background Tube */}
+            {/* Background */}
             <path
                 d={arcPath}
                 fill="none"
-                stroke={primaryColor}
+                stroke="#ffffff"
                 strokeOpacity={0.15}
                 strokeWidth={strokeWidth}
                 strokeLinecap="round"
             />
-            {/* Liquid Fill */}
+            {/* Fill */}
             <motion.path
                 ref={pathRef}
                 d={arcPath}
@@ -106,41 +96,36 @@ const Segment: React.FC<SegmentProps> = ({ index, isCurrent, isCompleted, fillPe
     );
 };
 
-
-// --- Main Progress Bar Component ---
 const LiquidTubeProgress: React.FC<LiquidTubeProgressProps> = ({
     fillPercentage,
-    currentPrayer,
-    prayerSegments,
-    primaryColor = "#8B5CF6",
+    currentPrayerIndex,
 }) => {
-    const currentPrayerIndex = prayerSegments.findIndex(p => p.name === currentPrayer);
-
     return (
         <div className="relative w-full flex justify-center items-center mt-2">
             <svg width="400" height="180" viewBox="0 0 400 180">
                 <defs>
                     <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
-                        <feDropShadow dx="0" dy="2" stdDeviation="3" floodColor={primaryColor} floodOpacity="0.3" />
+                        <feDropShadow dx="0" dy="2" stdDeviation="3" floodColor="#ffffff" floodOpacity="0.3" />
                     </filter>
                 </defs>
+
                 <g filter="url(#glow)">
-                    {prayerSegments.map((_, index) => (
+                    {PRAYER_NAMES.map((_, index) => (
                         <Segment
                             key={index}
                             index={index}
                             isCurrent={index === currentPrayerIndex}
                             isCompleted={index < currentPrayerIndex}
                             fillPercentage={fillPercentage}
-                            primaryColor={primaryColor}
                         />
                     ))}
                 </g>
-                {/* Prayer labels below the tube */}
-                {prayerSegments.map((prayer, index) => {
+
+
+                {PRAYER_NAMES.map((prayerName, index) => {
                     const totalAngle = 180;
                     const numSegments = 5;
-                    const gapAngle = 4;
+                    const gapAngle = 8;
                     const segmentAngle = (totalAngle - (numSegments - 1) * gapAngle) / numSegments;
                     const angle = -180 + index * (segmentAngle + gapAngle) + segmentAngle / 2;
                     const rx = 150; // Horizontal radius
@@ -153,19 +138,20 @@ const LiquidTubeProgress: React.FC<LiquidTubeProgressProps> = ({
 
                     return (
                         <motion.text
-                            key={`label-${index}`}
+                            key={index}
                             x={x}
                             y={y}
                             textAnchor="middle"
                             dominantBaseline="middle"
-                            className={`text-xs font-medium ${index === currentPrayerIndex ? 'fill-white' : 'fill-gray-400'}`}
+                            className={`text-xs font-medium ${index === currentPrayerIndex ? 'fill-white' : 'fill-white/60'
+                                }`}
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
                             transition={{ duration: 1, delay: 1 + (index * 0.1) }}
                         >
-                            {prayer.name}
+                            {prayerName}
                         </motion.text>
-                    )
+                    );
                 })}
             </svg>
         </div>
