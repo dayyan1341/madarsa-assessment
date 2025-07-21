@@ -39,7 +39,7 @@ const TEST_DATES = {
 
 export const PrayerCard: React.FC = () => {
     const { prayerTimes, address } = usePrayerStore();
-    const [now, setNow] = useState(TEST_DATES.Fajr || new Date());
+    const [now, setNow] = useState(new Date());
 
     useEffect(() => {
         const timer = setInterval(() => setNow(new Date()), 60000);

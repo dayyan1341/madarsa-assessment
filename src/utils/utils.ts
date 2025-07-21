@@ -17,7 +17,10 @@ export const getPrayerInfo = (now: Date, prayerTimes: PrayerTimes) => {
     let currentPrayerIndex: number;
     let nextPrayerTime: Date;
 
-    if (nextPrayerIndex === -1) {
+    if (nextPrayerIndex == 0 && prayerDateTimes[0] > now) {
+        currentPrayerIndex = 4; // Isha
+        nextPrayerTime = prayerDateTimes[0];
+    } else if (nextPrayerIndex === -1) {
         currentPrayerIndex = 4; // Isha
         nextPrayerTime = parse(prayerTimes.Fajr, 'HH:mm', tomorrow);
     } else {
